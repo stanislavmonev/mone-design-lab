@@ -1,33 +1,67 @@
 'use client';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { ContactShadows, Environment } from '@react-three/drei';
-import { useMemo, useRef } from 'react';
+import { Environment, ContactShadows } from '@react-three/drei';
+import { useRef } from 'react';
 import * as THREE from 'three';
 
-const STONE='#c6b9a4', STONE_DARK='#9b8c77', BRONZE='#4b4035', GLASS='#18242a';
-function Box({p,s,c,metal=0,rough=.65,emissive,ei=0}:{p:[number,number,number],s:[number,number,number],c:string,metal?:number,rough?:number,emissive?:string,ei?:number}){return <mesh position={p} castShadow receiveShadow><boxGeometry args={s}/><meshStandardMaterial color={c} metalness={metal} roughness={rough} emissive={emissive||'#000000'} emissiveIntensity={ei}/></mesh>}
-function Glass({p,s,lit=false}:{p:[number,number,number],s:[number,number,number],lit?:boolean}){return <mesh position={p}><boxGeometry args={s}/><meshPhysicalMaterial color={lit?'#89745c':GLASS} metalness={.42} roughness={.12} transparent opacity={.83} clearcoat={1} clearcoatRoughness={.08} emissive={lit?'#ba8851':'#000000'} emissiveIntensity={lit?.24:0}/></mesh>}
-function Plant({p,scale=1}:{p:[number,number,number],scale?:number}){return <group position={p} scale={scale}><Box p={[0,.15,0]} s={[.42,.3,.42]} c="#6d685b"/><mesh position={[0,.48,0]} castShadow><icosahedronGeometry args={[.38,1]}/><meshStandardMaterial color="#39483b" roughness={.95}/></mesh><mesh position={[.2,.6,.08]} castShadow><icosahedronGeometry args={[.26,1]}/><meshStandardMaterial color="#4e5c48" roughness={.95}/></mesh></group>}
-function Residence({progress}:{progress:number}){const group=useRef<THREE.Group>(null);const floors=5;useFrame(({clock})=>{if(group.current){group.current.rotation.y=0;group.current.position.y=-.48}});const eased=useMemo(()=>Array.from({length:floors},(_,i)=>THREE.MathUtils.smoothstep(progress,.025+i*.085,.17+i*.085)),[progress]);return <group ref={group}>
-{/* podium and entrance */}
-<Box p={[0,-.3,0]} s={[9,.48,7.2]} c="#363733"/><Box p={[0,-.03,0]} s={[7.5,.13,5.3]} c={STONE_DARK}/><Box p={[0,.45,2.63]} s={[2.6,.9,.12]} c={BRONZE} metal={.55}/><Glass p={[0,.43,2.71]} s={[2.22,.75,.08]}/><Box p={[0,.04,3.1]} s={[3,.07,1.4]} c="#b9b1a4"/>
-{Array.from({length:floors},(_,floor)=>{const v=eased[floor];if(v<.002)return null;const y=floor*.96+.2;return <group key={floor} position={[0,y,0]} scale={[1,v,1]}>
-{/* stone slabs with cantilevered alternating terraces */}
-<Box p={[0,.03,0]} s={[7.1,.17,5.05]} c={STONE}/><Box p={[0,.93,0]} s={[7.18,.15,5.13]} c={STONE}/>
-<Box p={[-3.45,.5,-.1]} s={[.22,.85,4.9]} c={STONE_DARK}/><Box p={[3.45,.5,-.1]} s={[.22,.85,4.9]} c={STONE}/>
-<Box p={[0,.5,-2.39]} s={[6.8,.83,.2]} c={STONE_DARK}/>
-{/* front wall, deeply inset glass and bronze mullions */}
-{Array.from({length:6},(_,i)=>{const x=-2.78+i*1.12;return <group key={i}><Glass p={[x,.51,2.36]} s={[1.035,.72,.08]} lit={progress>.86&&(i+floor)%3===0}/><Box p={[x+.55,.51,2.45]} s={[.075,.83,.12]} c={BRONZE} metal={.8} rough={.26}/><Box p={[x,.49,2.29]} s={[.018,.76,.035]} c="#8d8374" metal={.7}/></group>})}
-{/* sculpted side windows */}
-{Array.from({length:3},(_,i)=><group key={i}><Glass p={[3.58,.5,-1.53+i*1.5]} s={[.07,.68,1.26]} lit={progress>.87&&i===1}/><Box p={[3.64,.5,-.83+i*1.5]} s={[.11,.85,.075]} c={BRONZE} metal={.7}/></group>)}
-{/* alternating sculptural travertine volumes */}
-{floor%2===0?<><Box p={[-2.92,.5,2.45]} s={[.78,.85,.35]} c={STONE}/><Box p={[2.83,.5,2.44]} s={[.84,.85,.35]} c={STONE}/></>:<><Box p={[1.95,.5,2.47]} s={[1.05,.85,.3]} c={STONE_DARK}/><Box p={[-3.05,.5,2.46]} s={[.65,.85,.3]} c={STONE}/></>}
-{/* floating balcony, transparent rail and metallic edge */}
-<Box p={[0,.06,2.87]} s={[7.45,.11,1.04]} c={STONE_DARK}/><Glass p={[0,.44,3.35]} s={[7.32,.63,.045]}/><Box p={[0,.76,3.37]} s={[7.35,.04,.075]} c={BRONZE} metal={.7}/><Box p={[-3.65,.43,2.95]} s={[.055,.63,.88]} c={BRONZE} metal={.6}/><Box p={[3.65,.43,2.95]} s={[.055,.63,.88]} c={BRONZE} metal={.6}/>
-{progress>.68&&<><Plant p={[-3.05,.17,2.86]} scale={.55}/><Plant p={[3.02,.17,2.86]} scale={.6}/></>}
+const limestone='#d6c7ae', shadowStone='#a89b88', bronze='#67513b', black='#171e20';
+type V=[number,number,number];
+function Solid({at,size,color,metalness=0,roughness=.78}:{at:V,size:V,color:string,metalness?:number,roughness?:number}){return <mesh position={at} castShadow receiveShadow><boxGeometry args={size}/><meshStandardMaterial color={color} metalness={metalness} roughness={roughness}/></mesh>}
+function Window({at,size,lit=false}:{at:V,size:V,lit?:boolean}){return <mesh position={at}><boxGeometry args={size}/><meshPhysicalMaterial color={lit?'#92714f':'#263b40'} metalness={.3} roughness={.08} transmission={.28} thickness={.12} transparent opacity={.78} emissive={lit?'#dca466':'#000000'} emissiveIntensity={lit?.55:0} clearcoat={1}/></mesh>}
+function Tree({at,scale=1}:{at:V,scale?:number}){return <group position={at} scale={scale}><mesh position={[0,.85,0]} castShadow><cylinderGeometry args={[.085,.13,1.7,9]}/><meshStandardMaterial color="#514538"/></mesh>{[[0,1.9,0,.8],[-.43,1.65,.17,.58],[.35,2.13,-.16,.65],[.14,1.55,.43,.54]].map((v,i)=><mesh key={i} position={[v[0],v[1],v[2]]} castShadow><icosahedronGeometry args={[v[3],2]}/><meshStandardMaterial color={i%2?'#344a39':'#405744'} roughness={1}/></mesh>)}</group>}
+function Apartment({floor}:{floor:number}){const y=floor*1.23+.52;return <group position={[0,y,0]}>
+<Solid at={[0,-.07,0]} size={[10.1,.2,6.6]} color={limestone}/>
+<Solid at={[0,1.18,0]} size={[10.2,.21,6.7]} color={limestone}/>
+<Solid at={[-4.91,.55,0]} size={[.27,1.12,6.35]} color={limestone}/>
+<Solid at={[4.91,.55,0]} size={[.27,1.12,6.35]} color={limestone}/>
+<Solid at={[0,.55,-3.14]} size={[9.7,1.1,.21]} color={shadowStone}/>
+{Array.from({length:8},(_,i)=>{const x=-4.13+i*1.18;return <group key={i}>
+<Window at={[x,.57,3.1]} size={[1.11,1.03,.09]} lit={(i+floor)%3!==0}/>
+<Solid at={[x+.58,.56,3.18]} size={[.058,1.12,.13]} color={bronze} metalness={.7} roughness={.24}/>
+<Solid at={[x,.57,3.19]} size={[1.11,.035,.11]} color={bronze} metalness={.65}/>
 </group>})}
-{progress>.53&&<group position={[0,5,0]} scale={[1,THREE.MathUtils.smoothstep(progress,.72,.92),1]}><Box p={[0,0,0]} s={[7.6,.24,5.4]} c={STONE}/><Box p={[0,.16,0]} s={[7.75,.1,5.55]} c="#403d37"/><Box p={[-2.9,.47,-1.5]} s={[.1,.55,1.5]} c={BRONZE}/><Box p={[2.9,.47,-1.5]} s={[.1,.55,1.5]} c={BRONZE}/><Box p={[0,.73,-1.5]} s={[6,.12,1.8]} c={STONE_DARK}/></group>}
-{/* landscaped site */}
-{progress>.58&&<><Plant p={[-4.25,0,2.2]} scale={1.25}/><Plant p={[4.4,0,1.9]} scale={1.2}/><Plant p={[-4.15,0,-2]} scale={.95}/><Plant p={[4.2,0,-2]} scale={.85}/></>}
+<Solid at={[-3.9,.55,3.21]} size={[.75,1.1,.27]} color={limestone}/>
+<Solid at={[3.93,.55,3.21]} size={[.75,1.1,.27]} color={limestone}/>
+<Solid at={[0,-.055,3.69]} size={[10.4,.13,1.28]} color={shadowStone}/>
+<Window at={[0,.49,4.29]} size={[10.18,.89,.048]}/>
+<Solid at={[0,.96,4.29]} size={[10.28,.046,.065]} color={bronze} metalness={.75}/>
+{Array.from({length:9},(_,i)=><Solid key={i} at={[-4.85+i*1.2,.49,4.3]} size={[.032,.94,.07]} color={bronze} metalness={.8}/>)}
+{[0,1,2].map((i)=><group key={i}><Window at={[5.06,.55,-2+i*1.9]} size={[.06,.95,1.5]} lit={i!==1}/><Solid at={[5.12,.55,-1.18+i*1.9]} size={[.08,1.12,.07]} color={bronze}/></group>)}
+{floor%2===0?<Solid at={[-2.65,.55,3.34]} size={[1.8,1.1,.32]} color={limestone}/>:<Solid at={[2.35,.55,3.34]} size={[2.15,1.1,.32]} color={limestone}/>}
+{[-4.48,4.48].map((x,i)=><group key={i}><Solid at={[x,.12,3.73]} size={[.54,.26,.53]} color="#777165"/><mesh position={[x,.47,3.73]} castShadow><sphereGeometry args={[.34,12,9]}/><meshStandardMaterial color="#3e5740"/></mesh></group>)}
 </group>}
-export default function BuildingScene({progress}:{progress:number}){return <Canvas shadows dpr={[1,1.75]} camera={{position:[11,7.3,15],fov:32}} gl={{antialias:true,alpha:true,toneMapping:THREE.ACESFilmicToneMapping}}><color attach="background" args={['#242522']}/><ambientLight intensity={1.3}/><hemisphereLight args={['#f0e2d2','#4c514c',2]}/><directionalLight position={[8,13,9]} intensity={3.5} color="#f5e7d2" castShadow shadow-mapSize={[2048,2048]} shadow-bias={-.0003}/><directionalLight position={[-7,6,-5]} intensity={2} color="#8c9aa5"/><pointLight position={[0,4,6]} intensity={16} color="#e8b77e" distance={13}/><Residence progress={progress}/><CameraRig progress={progress}/><ContactShadows position={[0,-.77,0]} opacity={.48} scale={20} blur={2.8} far={13}/><Environment preset="sunset"/></Canvas>}
+function Furniture(){return <group position={[0,5.46,0]}>
+<Solid at={[0,-.02,0]} size={[9.4,.08,6.2]} color="#b9a48a"/>
+<Solid at={[0,1.2,-3]} size={[9.4,2.4,.12]} color="#8d7967"/>
+<Solid at={[-2.2,.34,.3]} size={[2.9,.5,1.35]} color="#e6dbcb"/>
+<Solid at={[-2.2,.69,-.25]} size={[2.9,.7,.23]} color="#e6dbcb"/>
+<Solid at={[-.45,.25,1.25]} size={[1.65,.12,.9]} color="#bd9d75"/>
+<Solid at={[-.45,.12,1.25]} size={[.28,.25,.28]} color={bronze} metalness={.7}/>
+<Solid at={[2.3,.37,-1.75]} size={[2.5,.7,.55]} color="#53483e"/>
+<Solid at={[2.3,.78,-1.72]} size={[2.5,.09,.6]} color="#bba184"/>
+<Solid at={[1.2,.02,.5]} size={[4.1,.025,2.5]} color="#988875"/>
+<mesh position={[0,1.85,-.4]}><sphereGeometry args={[.18,16,12]}/><meshStandardMaterial color="#dcb981" emissive="#e8ae6b" emissiveIntensity={2}/></mesh>
+<pointLight position={[0,1.8,0]} intensity={15} color="#ffd4a1" distance={8}/>
+</group>}
+function Architecture({progress}:{progress:number}){return <group>
+<mesh position={[0,-.54,0]} receiveShadow><boxGeometry args={[50,.15,50]}/><meshStandardMaterial color="#343c34" roughness={1}/></mesh>
+<Solid at={[0,-.34,0]} size={[12,.35,9]} color="#5b5850"/>
+<Solid at={[0,-.13,0]} size={[10.4,.18,7]} color={limestone}/>
+<Solid at={[0,.31,3.23]} size={[3.4,.7,.2]} color={bronze} metalness={.7}/>
+<Window at={[0,.3,3.36]} size={[3.1,.62,.08]} lit/>
+{Array.from({length:5},(_,i)=>{const t=THREE.MathUtils.smoothstep(progress,.035+i*.085,.17+i*.085);return <group key={i} position={[0,i*1.23,0]} scale={[1,Math.max(.001,t),1]} visible={t>.001}><Apartment floor={0}/></group>})}
+<group position={[0,6.16,0]} scale={[1,Math.max(.001,THREE.MathUtils.smoothstep(progress,.46,.6)),1]}>
+<Solid at={[0,.06,0]} size={[10.5,.3,7]} color={limestone}/>
+<Solid at={[0,.25,0]} size={[10.7,.09,7.2]} color="#5d554a"/>
+<Solid at={[0,.52,-2.15]} size={[8.3,.07,1.5]} color={bronze} metalness={.6}/>
+{Array.from({length:7},(_,i)=><Solid key={i} at={[-3.7+i*1.22,.38,-2.15]} size={[.065,.32,1.5]} color={bronze}/>)}
+</group>
+{progress>.59&&<><Tree at={[-7,-.47,2.8]} scale={1.65}/><Tree at={[7.4,-.47,1.8]} scale={1.7}/><Tree at={[-8,-.47,-4]} scale={1.2}/><Tree at={[8,-.47,-4]} scale={1.25}/>
+{Array.from({length:12},(_,i)=><mesh key={i} position={[-5.5+i,.01,5.8]}><sphereGeometry args={[.22,8,7]}/><meshStandardMaterial color={i%2?'#506347':'#40533d'}/></mesh>)}
+<Solid at={[0,-.37,7.5]} size={[4.2,.08,6]} color="#8b8174"/>
+{Array.from({length:6},(_,i)=><Solid key={i} at={[0,-.26,5.2+i*.55]} size={[3.5,.025,.05]} color="#c2b59f"/>)}
+</>}
+{progress>.75&&<Furniture/>}
+</group>}
+function CameraMotion({progress}:{progress:number}){const {camera}=useThree();const aim=useRef(new THREE.Vector3(0,3,0));useFrame((_,delta)=>{const p=THREE.MathUtils.clamp(progress,0,1);const orbit=THREE.MathUtils.smoothstep(p,.12,.66);const approach=THREE.MathUtils.smoothstep(p,.67,.85);const enter=THREE.MathUtils.smoothstep(p,.85,1);const pos=new THREE.Vector3(15-8*orbit,9-1.8*orbit,21-6*orbit).lerp(new THREE.Vector3(0,5.8,5.2),approach).lerp(new THREE.Vector3(-1.2,6.05,1.5),enter);camera.position.lerp(pos,1-Math.exp(-delta*6));const look=new THREE.Vector3(0,3.25,0).lerp(new THREE.Vector3(0,6.1,0),approach).lerp(new THREE.Vector3(1,5.95,-1.3),enter);aim.current.lerp(look,1-Math.exp(-delta*6));camera.lookAt(aim.current)});return null}
+export default function BuildingScene({progress}:{progress:number}){return <Canvas shadows dpr={[1,1.6]} camera={{position:[15,9,21],fov:37}} gl={{antialias:true,alpha:false,toneMapping:THREE.ACESFilmicToneMapping}}><color attach="background" args={['#232b2b']}/><fog attach="fog" args={['#232b2b',29,58]}/><ambientLight intensity={.75}/><hemisphereLight args={['#c9d5db','#4d4539',1.8]}/><directionalLight position={[9,14,10]} intensity={3.3} color="#ffcf9d" castShadow shadow-mapSize={[2048,2048]}/><directionalLight position={[-10,8,-7]} intensity={2.3} color="#8ca4b9"/><pointLight position={[0,5,6]} color="#e9ac6d" intensity={25} distance={16}/><Architecture progress={progress}/><CameraMotion progress={progress}/><ContactShadows position={[0,-.48,0]} opacity={.48} scale={35} blur={2.4} far={18}/><Environment preset="sunset"/></Canvas>}
