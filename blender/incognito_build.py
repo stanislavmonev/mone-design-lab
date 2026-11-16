@@ -12,7 +12,7 @@ scene.render.resolution_x=1920; scene.render.resolution_y=1080; scene.render.res
 scene.render.image_settings.file_format='PNG'
 scene.render.film_transparent=False
 scene.world.color=(.13,.14,.16)
-scene.frame_start=1; scene.frame_end=180; scene.render.fps=30
+scene.frame_start=1; scene.frame_end=360; scene.render.fps=30
 def mat(name,color,metal=0,rough=.55,emit=0):
  m=bpy.data.materials.new(name);m.diffuse_color=(*color,1);m.use_nodes=True
  p=m.node_tree.nodes.get('Principled BSDF');p.inputs['Base Color'].default_value=(*color,1);p.inputs['Metallic'].default_value=metal;p.inputs['Roughness'].default_value=rough
@@ -29,8 +29,7 @@ def cube(name,loc,scale,material,begin=1,end=None,bevel=0):
  if end:
   o.scale.z=.001;o.keyframe_insert(data_path='scale',frame=begin)
   o.scale.z=1;o.keyframe_insert(data_path='scale',frame=end)
-  for fc in o.animation_data.action.fcurves:
-   for k in fc.keyframe_points:k.interpolation='BEZIER'
+  # Blender 4.x and 5.x use different Action APIs; native interpolation is sufficient.
  return o
 cube('site plinth',(0,-.25,0),(11,.45,9),dark)
 cube('courtyard',(0,-.52,0),(70,.08,70),ground)
@@ -55,11 +54,54 @@ def tree(x,z,s):
  for dx,dz,dy,rad in [(0,0,1.1,.68),(.3,.1,1.3,.53),(-.3,-.1,1.25,.48)]:
   bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=rad*s,location=(x+dx*s,dy*s,z+dz*s));bpy.context.object.data.materials.append(green)
 for x,z,s in [(-6,2,1.5),(6.3,1.7,1.25),(-6,-3,1.2),(6,-3,1.3)]:tree(x,z,s)
+# Penthouse interior: same building coordinate space, not an unrelated image.
+# Upper residential level is y=5.5..6.9; facade glazing is at z=3.
+walnut=mat('smoked walnut',(.22,.135,.085),0,.32)
+fabric=mat('ivory boucle upholstery',(.75,.69,.59),0,.87)
+marble=mat('cream marble',(.78,.75,.69),0,.18)
+black=mat('graphite architectural metal',(.045,.043,.04),.8,.23)
+brass=mat('champagne brass',(.62,.43,.23),.85,.2)
+cube('penthouse walnut feature wall',(0,6.08,-2.7),(8.0,1.65,.18),walnut,170,205,.02)
+cube('penthouse stone floor',(0,5.52,.1),(8.3,.1,5.6),marble,166,195,.025)
+cube('penthouse ceiling',(0,6.89,.1),(8.3,.1,5.6),stone2,170,205,.025)
+# Living area is positioned to the right of the camera's entry trajectory.
+cube('designer sofa seat',(1.5,5.88,.15),(2.65,.3,.9),fabric,174,214,.11)
+cube('designer sofa back',(1.5,6.1,-.26),(2.65,.64,.22),fabric,174,214,.08)
+for sx in [.32,2.68]:
+ cube('designer sofa arm',(sx,6.02,.13),(.22,.52,.92),fabric,174,214,.09)
+cube('sculptural marble coffee table',(1.35,5.79,1.36),(1.28,.13,.68),marble,180,220,.065)
+cube('coffee table pedestal',(1.35,5.67,1.36),(.38,.26,.38),brass,180,220,.035)
+cube('architectural rug',(1.4,5.58,.32),(3.7,.025,2.65),fabric,180,220,.02)
+cube('bespoke low credenza',(-2.4,5.85,-2.4),(2.3,.48,.4),walnut,180,220,.025)
+for x in [-3.3,-2.7,-2.1,-1.5]:
+ cube('bronze cabinetry detailing',(x,5.86,-2.17),(.018,.4,.02),brass,180,220)
+# Pendant light fixture with multiple suspended warm lamps.
+for x,z,y in [(-.8,-.1,6.15),(-.4,.3,6.0),(0,-.1,6.25)]:
+ cube('suspended pendant cable',(x,6.62,z),(.012,.48,.012),black,180,220)
+ bpy.ops.mesh.primitive_uv_sphere_add(segments=24,ring_count=12,radius=.12,location=(x,y,z))
+ bulb=bpy.context.object;bulb.name='pendant globe';bulb.data.materials.append(light)
+ bpy.ops.object.light_add(type='POINT',location=(x,y,z));bpy.context.object.data.energy=65;bpy.context.object.data.color=(1,.7,.43)
+# Camera dolly crosses the real facade into the same 3D penthouse.
 # architectural camera: single continuous dolly/orbit, no jump cuts
 def aim(obj,target):obj.rotation_euler=(Vector(target)-obj.location).to_track_quat('-Z','Y').to_euler()
-bpy.ops.object.camera_add(location=(15,9,22));cam=bpy.context.object;scene.camera=cam;cam.data.type='ORTHO';cam.data.ortho_scale=19
-for frame,position,scale in [(1,(16,8,24),20),(90,(14,9,21),19),(180,(12,10,19),18)]:
- cam.location=position;cam.data.ortho_scale=scale;aim(cam,(0,3,0));cam.keyframe_insert('location',frame=frame);cam.keyframe_insert('rotation_euler',frame=frame);cam.data.keyframe_insert('ortho_scale',frame=frame)
+bpy.ops.object.camera_add(location=(15,9,22));cam=bpy.context.object;scene.camera=cam
+cam.data.type='PERSP';cam.data.lens=38
+# 1-190: architectural construction; 190-240: finished facade reveal;
+# 240-300: approach glass; 300-360: enter penthouse, reveal furniture.
+camera_keys=[
+ (1,(17,10,24),(0,3,0),40),
+ (120,(14,9,20),(0,3,0),38),
+ (190,(11,8,17),(0,3,0),39),
+ (240,(5,7.5,13),(0,5.8,1),42),
+ (275,(1.1,6.2,7.5),(0,6.0,0),40),
+ (300,(0,6.05,3.35),(0,6.0,-1.4),32),
+ (330,(-.3,6.1,1.4),(1.2,5.9,-.5),30),
+ (360,(-1.5,6.25,.65),(1.2,5.9,.1),29)]
+for frame,position,target,lens in camera_keys:
+ cam.location=position;cam.data.lens=lens;aim(cam,target)
+ cam.keyframe_insert('location',frame=frame)
+ cam.keyframe_insert('rotation_euler',frame=frame)
+ cam.data.keyframe_insert('lens',frame=frame)
 def area(name,loc,power,color,size):
  bpy.ops.object.light_add(type='AREA',location=loc);o=bpy.context.object;o.name=name;o.data.energy=power;o.data.color=color;o.data.shape='DISK';o.data.size=size;aim(o,(0,2,0))
 area('large softbox',(2,15,12),3000,(1,.82,.66),12);area('sky fill',(-11,10,-7),2600,(.65,.77,1),15)
@@ -67,4 +109,4 @@ scene.view_settings.view_transform='AgX'
 scene.render.filepath='//render/frames/'
 # Uncomment next line to render entire sequence:
 # bpy.ops.render.render(animation=True)
-print('INCOGNOTO: 180-frame animated architectural scene prepared. Uncomment render call to export frames.')
+print('INCOGNOTO: 360-frame exterior-to-interior architectural scene prepared. Uncomment render call to export frames.')
