@@ -1,14 +1,15 @@
 'use client';
-import { useEffect,useRef,useState } from 'react';
+import { Component, useEffect,useRef,useState } from 'react';
 import { ArrowDown,ArrowUpRight,Menu,X } from 'lucide-react';
 import dynamic from 'next/dynamic';
-const BuildingScene=dynamic(()=>import('@/components/BuildingScene'),{ssr:false});
+const BuildingScene=dynamic(()=>import('@/components/BuildingScene'),{ssr:false,loading:()=>null});
+class SceneErrorBoundary extends Component<{children:React.ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return {failed:true}}componentDidCatch(error:Error){console.error('INCOGNOTO 3D scene failed; showing architectural fallback',error)}render(){return this.state.failed?<div className="inc-journey-fallback" style={{position:'absolute',inset:0,background:'linear-gradient(90deg,rgba(0,0,0,.3),transparent),url(https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=2200&q=85) center/cover'}}/>:this.props.children}}
 const clamp=(n:number)=>Math.max(0,Math.min(1,n));
 const building='https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=2200&q=90';
 const exterior='https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1800&q=88';
 const furniture='https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1800&q=88';
 export default function Home(){const stage=useRef<HTMLElement>(null);const [progress,setProgress]=useState(0);const [menu,setMenu]=useState(false);useEffect(()=>{let id=0;const onScroll=()=>{cancelAnimationFrame(id);id=requestAnimationFrame(()=>{if(!stage.current)return;const r=stage.current.getBoundingClientRect();setProgress(clamp(-r.top/Math.max(1,stage.current.offsetHeight-innerHeight)))});};onScroll();window.addEventListener('scroll',onScroll,{passive:true});window.addEventListener('resize',onScroll);return()=>{window.removeEventListener('scroll',onScroll);window.removeEventListener('resize',onScroll);cancelAnimationFrame(id)}},[]);return <main className="inc-site"><header className="inc-header"><a href="#" className="inc-brand">INCOGNOTO<span>®</span></a><nav className={menu?'inc-nav is-open':'inc-nav'}><a href="#experience" onClick={()=>setMenu(false)}>THE EXPERIENCE</a><a href="#residences" onClick={()=>setMenu(false)}>RESIDENCES</a><a href="#collection" onClick={()=>setMenu(false)}>THE COLLECTION</a><a href="#contact" onClick={()=>setMenu(false)}>CONTACT <ArrowUpRight size={13}/></a></nav><button className="inc-menu" aria-label="Toggle menu" onClick={()=>setMenu(!menu)}>{menu?<X/>:<Menu/>}</button></header><section className="inc-journey" id="experience" ref={stage}><div className="inc-journey-sticky">
-<div className="inc-journey-3d" style={{opacity:clamp((.82-progress)/.13),pointerEvents:'none'}}><BuildingScene progress={clamp(progress/.63)}/></div>
+<div className="inc-journey-3d" style={{opacity:clamp((.82-progress)/.13),pointerEvents:'none'}}><SceneErrorBoundary><BuildingScene progress={clamp(progress/.63)}/></SceneErrorBoundary></div>
 <div className="inc-journey-architecture" style={{opacity:clamp((progress-.47)/.13)*clamp((.79-progress)/.1),transform:`scale(${1.12-(progress-.47)*.26})`,backgroundImage:`url("${exterior}")`}}/>
 <div className="inc-journey-interior" style={{opacity:clamp((progress-.72)/.13),transform:`scale(${1.25-clamp((progress-.72)/.28)*.25})`,backgroundImage:`url("${furniture}")`}}/>
 <div className="inc-journey-shade"/>
